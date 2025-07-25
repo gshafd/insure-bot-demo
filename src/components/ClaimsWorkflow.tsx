@@ -1,27 +1,27 @@
-import React, { useState, useEffect } from 'react';
-import { Card } from '@/components/ui/card';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Upload, Shield, Calculator, Mail, AlertCircle, CheckCircle, Clock } from 'lucide-react';
+import { Upload, CheckCircle, Clock, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface WorkflowStep {
   id: number;
   title: string;
   description: string;
-  status: 'pending' | 'processing' | 'completed' | 'error';
-  result?: any;
+  status: 'pending' | 'processing' | 'completed';
+  result?: string;
 }
 
 export const ClaimsWorkflow = () => {
   const { toast } = useToast();
-  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [prompt, setPrompt] = useState('');
-  const [results, setResults] = useState<string[]>([]);
+  const [currentStepIndex, setCurrentStepIndex] = useState(-1);
+  const [completedSteps, setCompletedSteps] = useState<WorkflowStep[]>([]);
 
-  const [steps, setSteps] = useState<WorkflowStep[]>([
+  const steps: WorkflowStep[] = [
     {
       id: 1,
       title: 'Claim Intake',
@@ -46,67 +46,166 @@ export const ClaimsWorkflow = () => {
       description: 'Calculate payout and generate communication',
       status: 'pending'
     }
-  ]);
+  ];
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      setUploadedFile(file);
+    const files = Array.from(event.target.files || []);
+    if (files.length > 0) {
+      setUploadedFiles(prev => [...prev, ...files]);
+      toast({
+        title: "Files uploaded successfully",
+        description: `${files.length} file(s) added to processing queue`,
+      });
     }
   };
 
+  const removeFile = (index: number) => {
+    setUploadedFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
   const performRequest = async () => {
-    if (!uploadedFile) {
+    if (uploadedFiles.length === 0) {
       toast({
-        title: "No file uploaded",
-        description: "Please upload a claims document first",
+        title: "No files uploaded",
+        description: "Please upload claims documents first",
         variant: "destructive",
       });
       return;
     }
 
     setIsProcessing(true);
-    setResults([]);
+    setCompletedSteps([]);
+    setCurrentStepIndex(0);
 
-    // Process each step
+    // Process each step sequentially
     for (let i = 0; i < steps.length; i++) {
-      // Update current step to processing
-      setSteps(prev => prev.map((step, idx) => ({
-        ...step,
-        status: idx === i ? 'processing' : idx < i ? 'completed' : 'pending'
-      })));
+      setCurrentStepIndex(i);
       
       // Simulate processing time
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      await new Promise(resolve => setTimeout(resolve, 2000 + Math.random() * 1000));
       
-      // Generate and add results
+      // Generate step result
       const stepResult = generateStepResult(i);
-      setResults(prev => [...prev, stepResult]);
+      const completedStep = {
+        ...steps[i],
+        status: 'completed' as const,
+        result: stepResult
+      };
       
-      // Update step to completed
-      setSteps(prev => prev.map((step, idx) => ({
-        ...step,
-        status: idx === i ? 'completed' : step.status,
-        result: idx === i ? stepResult : step.result
-      })));
+      // Add completed step to results
+      setCompletedSteps(prev => [...prev, completedStep]);
+      setCurrentStepIndex(-1);
+      
+      // Brief pause before next step
+      await new Promise(resolve => setTimeout(resolve, 500));
     }
 
     setIsProcessing(false);
+    toast({
+      title: "Processing completed",
+      description: "All workflow steps have been completed successfully",
+    });
   };
 
   const generateStepResult = (stepIndex: number) => {
     switch (stepIndex) {
       case 0:
-        return "Claim intake analysis complete. This is an ACORD form for reporting vehicle damage, including details of involved parties, damages, and witnesses. Policy number: POL-2024-789456, Claim number: CLM-2024-001234 created for the new FNOL. Policy period is valid and active. Documents stored in shared point folder /claims/2024/CLM-001234.";
+        return `Claim intake analysis complete for ${uploadedFiles.length} document(s).
+
+This is an ACORD form for reporting vehicle damage, including details of involved parties, damages, and witnesses.
+
+Key Information Extracted:
+• Policy Number: POL-2024-789456
+• Claim Number: CLM-2024-001234 (newly created FNOL)
+• Policy Status: Active and Valid
+• Incident Date: January 15, 2024
+• Claimant: John Smith
+• Document Storage: /claims/2024/CLM-001234
+
+Policy period verification: PASSED - Policy is current and active.`;
       
       case 1:
-        return "Coverage verification complete. Policy details confirmed - the claim raised is covered under Collision Coverage with a deductible of $500 and coverage limit of $25,000. The incident falls within policy terms and conditions.";
+        return `Coverage verification analysis complete.
+
+Policy Details Confirmed:
+• Coverage Type: Collision Coverage
+• Policy Holder: John Smith
+• Deductible: $500
+• Coverage Limit: $25,000
+• Policy Effective: 01/01/2024 - 12/31/2024
+
+Claim Verification:
+• Incident Type: Vehicle collision (backing into pole)
+• Coverage Status: COVERED under policy terms
+• Claim Validity: APPROVED for processing
+
+The claim falls within policy terms and conditions. Proceeding with damage assessment.`;
       
       case 2:
-        return "Damage assessment analysis complete. Rear fender damage identified from backing into a pole. Estimated repair costs: $3,250 including parts and labor. Severity assessed as moderate damage requiring bumper replacement and paint work.";
+        return `Damage assessment analysis complete.
+
+Incident Details:
+• Description: Rear fender damage from backing into a pole
+• Vehicle: 2022 Honda Accord
+• Damage Location: Rear bumper and fender
+• Severity Level: Moderate
+
+Repair Assessment:
+• Parts Required: Rear bumper replacement, paint work
+• Labor Hours: 8-10 hours estimated
+• Parts Cost: $1,800
+• Labor Cost: $1,450
+• Total Repair Estimate: $3,250
+
+Damage photos and repair estimates have been validated against industry standards.`;
       
       case 3:
-        return "Settlement calculation complete. Total claim amount: $3,250. After applying $500 deductible, estimated payout: $2,750. Email communication drafted for claims representative to send to policy holder regarding settlement offer and next steps.";
+        return `Settlement calculation complete.
+
+Financial Summary:
+• Total Claim Amount: $3,250
+• Policy Deductible: $500
+• Net Payout Amount: $2,750
+
+Settlement Details:
+• Payment Method: Direct Deposit
+• Processing Time: 3-5 business days
+• Claim Status: Approved for Payment
+
+--- DRAFT EMAIL COMMUNICATION ---
+
+Subject: Claim Settlement Approved - Claim #CLM-2024-001234
+
+Dear Mr. Smith,
+
+We have completed the review of your auto insurance claim #CLM-2024-001234 for the incident that occurred on January 15, 2024.
+
+Good news! Your claim has been approved for settlement.
+
+Settlement Details:
+• Total repair estimate: $3,250.00
+• Your deductible: $500.00
+• Settlement amount: $2,750.00
+
+Payment Information:
+Your settlement payment of $2,750.00 will be processed via direct deposit to your account on file within 3-5 business days.
+
+Next Steps:
+1. You may proceed with repairs at any authorized repair facility
+2. Please retain all receipts for your records
+3. Contact us if you need assistance finding a preferred repair shop
+
+If you have any questions about your settlement, please don't hesitate to contact me directly.
+
+Best regards,
+Claims Representative
+Auto Insurance Company
+Phone: (555) 123-4567
+Email: claims@autoinsurance.com
+
+--- END DRAFT EMAIL ---
+
+Claim processing complete. Settlement approved and communication drafted.`;
       
       default:
         return "";
@@ -114,11 +213,11 @@ export const ClaimsWorkflow = () => {
   };
 
   const resetWindow = () => {
-    setSteps(prev => prev.map(step => ({ ...step, status: 'pending', result: undefined })));
+    setCompletedSteps([]);
+    setCurrentStepIndex(-1);
     setIsProcessing(false);
-    setUploadedFile(null);
+    setUploadedFiles([]);
     setPrompt('');
-    setResults([]);
   };
 
   return (
@@ -143,10 +242,12 @@ export const ClaimsWorkflow = () => {
             
             {/* Upload File Section */}
             <div className="space-y-3">
-              <label className="block text-sm font-medium">Upload File</label>
+              <label className="block text-sm font-medium">Upload Files</label>
+              
+              {/* File Upload Input */}
               <div className="flex items-center gap-3">
                 <div className="flex-1 bg-background border rounded px-3 py-2 text-sm">
-                  {uploadedFile ? uploadedFile.name : 'Filled_Auto_Claim_Form.pdf'}
+                  {uploadedFiles.length > 0 ? `${uploadedFiles.length} file(s) selected` : 'No files selected'}
                 </div>
                 <label htmlFor="file-upload">
                   <Button 
@@ -164,9 +265,30 @@ export const ClaimsWorkflow = () => {
                   onChange={handleFileUpload}
                   className="hidden"
                   id="file-upload"
+                  multiple
                 />
               </div>
-              <p className="text-xs text-muted-foreground">Supported files: All file types.</p>
+              
+              {/* Uploaded Files List */}
+              {uploadedFiles.length > 0 && (
+                <div className="space-y-2 max-h-32 overflow-y-auto">
+                  {uploadedFiles.map((file, index) => (
+                    <div key={index} className="flex items-center justify-between bg-background border rounded px-3 py-2">
+                      <span className="text-sm truncate flex-1">{file.name}</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeFile(index)}
+                        className="h-6 w-6 p-0"
+                      >
+                        <X className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              
+              <p className="text-xs text-muted-foreground">Supported files: All file types. Multiple files allowed.</p>
             </div>
 
             {/* Prompt Section */}
@@ -189,7 +311,7 @@ export const ClaimsWorkflow = () => {
             <div className="flex gap-3">
               <Button 
                 onClick={performRequest} 
-                disabled={isProcessing}
+                disabled={isProcessing || uploadedFiles.length === 0}
                 className="bg-primary hover:bg-primary/90 px-8"
               >
                 {isProcessing ? 'Processing...' : 'Perform Request'}
@@ -206,63 +328,56 @@ export const ClaimsWorkflow = () => {
         </div>
 
         {/* Right Panel */}
-        <div className="bg-background p-6 border-l">
+        <div className="bg-background p-6 border-l overflow-y-auto">
           <h2 className="text-xl font-semibold mb-6">Results</h2>
           
-          <div className="space-y-4">
-            {results.length === 0 && !isProcessing && (
+          <div className="space-y-6">
+            {!isProcessing && completedSteps.length === 0 && (
               <div className="text-muted-foreground">
-                Upload a claims document and click "Perform Request" to see results.
+                Upload claims documents and click "Perform Request" to see results.
               </div>
             )}
             
-            {/* Processing Status */}
-            {isProcessing && (
-              <div className="space-y-4">
-                {steps.map((step, index) => (
-                  <div key={step.id} className="flex items-start gap-3">
-                    <div className="flex-shrink-0 mt-1">
-                      {step.status === 'completed' ? (
-                        <CheckCircle className="w-5 h-5 text-success" />
-                      ) : step.status === 'processing' ? (
-                        <Clock className="w-5 h-5 text-primary animate-spin" />
-                      ) : (
-                        <div className="w-5 h-5 border-2 border-muted rounded-full" />
-                      )}
-                    </div>
-                    <div>
-                      <h3 className="font-medium">{step.title}</h3>
-                      <p className="text-sm text-muted-foreground">{step.description}</p>
-                      {step.status === 'processing' && (
-                        <p className="text-sm text-primary mt-1">Processing...</p>
-                      )}
-                    </div>
+            {/* Currently Processing Step */}
+            {isProcessing && currentStepIndex >= 0 && (
+              <div className="space-y-3">
+                <div className="flex items-start gap-3">
+                  <Clock className="w-5 h-5 text-primary animate-spin mt-1" />
+                  <div>
+                    <h3 className="font-medium">{steps[currentStepIndex].title}</h3>
+                    <p className="text-sm text-muted-foreground">{steps[currentStepIndex].description}</p>
+                    <p className="text-sm text-primary mt-1">Processing...</p>
                   </div>
-                ))}
+                </div>
               </div>
             )}
             
-            {/* Results Display */}
-            {results.map((result, index) => (
-              <div key={index} className="space-y-3">
+            {/* Completed Steps Results */}
+            {completedSteps.map((step, index) => (
+              <div key={step.id} className="space-y-3">
                 <div className="flex items-center gap-2">
                   <CheckCircle className="w-5 h-5 text-success" />
-                  <h3 className="font-medium">{steps[index]?.title} Complete</h3>
+                  <h3 className="font-medium">{step.title} Complete</h3>
                 </div>
-                <p className="text-sm leading-relaxed pl-7">{result}</p>
-                {index < results.length - 1 && <div className="border-b border-border/50 pb-3" />}
+                <div className="pl-7">
+                  <pre className="text-sm leading-relaxed whitespace-pre-wrap font-sans">{step.result}</pre>
+                </div>
+                {index < completedSteps.length - 1 && (
+                  <div className="border-b border-border/50 pb-3" />
+                )}
               </div>
             ))}
             
             {/* Final completion message */}
-            {results.length === steps.length && (
+            {completedSteps.length === steps.length && !isProcessing && (
               <div className="mt-6 p-4 bg-success/10 border border-success/20 rounded-lg">
                 <div className="flex items-center gap-2 text-success font-medium">
                   <CheckCircle className="w-5 h-5" />
-                  Claims Processing Complete
+                  Multi-Agent Claims Processing Complete
                 </div>
                 <p className="text-sm mt-2">
-                  All workflow steps have been completed successfully. The estimated payout of $2,750 has been calculated and communication is ready for the claims representative.
+                  All {steps.length} autonomous agents have completed their sequential processing. 
+                  Settlement of $2,750 has been approved and email communication is ready for dispatch.
                 </p>
               </div>
             )}
