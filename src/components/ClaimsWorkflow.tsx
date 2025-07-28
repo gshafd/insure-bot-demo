@@ -231,7 +231,7 @@ Claim processing complete. Settlement approved and communication drafted.`;
             className="w-full h-full object-cover"
           />
         </div>
-        <h1 className="text-2xl font-bold text-foreground">Data Extraction</h1>
+        <h1 className="text-2xl font-bold text-foreground">Autonomous claims agent</h1>
       </div>
 
       <div className="grid lg:grid-cols-2 h-[calc(100vh-120px)]">
@@ -291,21 +291,6 @@ Claim processing complete. Settlement approved and communication drafted.`;
               <p className="text-xs text-muted-foreground">Supported files: All file types. Multiple files allowed.</p>
             </div>
 
-            {/* Prompt Section */}
-            <div className="space-y-3">
-              <label className="block text-sm font-medium">Prompt</label>
-              <div className="relative">
-                <Textarea
-                  value={prompt}
-                  onChange={(e) => setPrompt(e.target.value)}
-                  className="min-h-20 resize-none"
-                  placeholder=""
-                />
-                <div className="absolute right-3 bottom-3">
-                  <Upload className="w-4 h-4 text-muted-foreground rotate-180" />
-                </div>
-              </div>
-            </div>
 
             {/* Action Buttons */}
             <div className="flex gap-3">
@@ -331,6 +316,40 @@ Claim processing complete. Settlement approved and communication drafted.`;
         <div className="bg-background p-6 border-l overflow-y-auto">
           <h2 className="text-xl font-semibold mb-6">Results</h2>
           
+          {/* Workflow Progress Section */}
+          {(isProcessing || completedSteps.length > 0) && (
+            <div className="mb-8">
+              <h3 className="text-lg font-medium mb-4">Workflow Progress</h3>
+              <div className="space-y-3">
+                {steps.map((step, index) => {
+                  const isCompleted = completedSteps.some(completed => completed.id === step.id);
+                  const isCurrentlyProcessing = currentStepIndex === index;
+                  const isPending = !isCompleted && !isCurrentlyProcessing;
+                  
+                  return (
+                    <div key={step.id} className="flex items-center gap-3 p-3 rounded-lg border">
+                      {isCompleted && <CheckCircle className="w-5 h-5 text-success" />}
+                      {isCurrentlyProcessing && <Clock className="w-5 h-5 text-primary animate-spin" />}
+                      {isPending && <div className="w-5 h-5 rounded-full border-2 border-muted" />}
+                      
+                      <div className="flex-1">
+                        <h4 className="font-medium">{step.title}</h4>
+                        <p className="text-sm text-muted-foreground">{step.description}</p>
+                        {isCurrentlyProcessing && (
+                          <p className="text-sm text-primary mt-1">Processing...</p>
+                        )}
+                        {isCompleted && (
+                          <p className="text-sm text-success mt-1">Completed</p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          
+          {/* Results Section */}
           <div className="space-y-6">
             {!isProcessing && completedSteps.length === 0 && (
               <div className="text-muted-foreground">
@@ -338,35 +357,27 @@ Claim processing complete. Settlement approved and communication drafted.`;
               </div>
             )}
             
-            {/* Currently Processing Step */}
-            {isProcessing && currentStepIndex >= 0 && (
-              <div className="space-y-3">
-                <div className="flex items-start gap-3">
-                  <Clock className="w-5 h-5 text-primary animate-spin mt-1" />
-                  <div>
-                    <h3 className="font-medium">{steps[currentStepIndex].title}</h3>
-                    <p className="text-sm text-muted-foreground">{steps[currentStepIndex].description}</p>
-                    <p className="text-sm text-primary mt-1">Processing...</p>
-                  </div>
+            {completedSteps.length > 0 && (
+              <div>
+                <h3 className="text-lg font-medium mb-4">Step Results</h3>
+                <div className="space-y-6">
+                  {completedSteps.map((step, index) => (
+                    <div key={step.id} className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle className="w-5 h-5 text-success" />
+                        <h4 className="font-medium">{step.title} Results</h4>
+                      </div>
+                      <div className="pl-7">
+                        <pre className="text-sm leading-relaxed whitespace-pre-wrap font-sans bg-muted/30 p-4 rounded border">{step.result}</pre>
+                      </div>
+                      {index < completedSteps.length - 1 && (
+                        <div className="border-b border-border/50 pb-3" />
+                      )}
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
-            
-            {/* Completed Steps Results */}
-            {completedSteps.map((step, index) => (
-              <div key={step.id} className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <CheckCircle className="w-5 h-5 text-success" />
-                  <h3 className="font-medium">{step.title} Complete</h3>
-                </div>
-                <div className="pl-7">
-                  <pre className="text-sm leading-relaxed whitespace-pre-wrap font-sans">{step.result}</pre>
-                </div>
-                {index < completedSteps.length - 1 && (
-                  <div className="border-b border-border/50 pb-3" />
-                )}
-              </div>
-            ))}
             
             {/* Final completion message */}
             {completedSteps.length === steps.length && !isProcessing && (
