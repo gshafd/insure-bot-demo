@@ -320,7 +320,7 @@ Claim processing complete. Settlement approved and communication drafted.`;
           {(isProcessing || completedSteps.length > 0) && (
             <div className="mb-8">
               <h3 className="text-lg font-medium mb-4">Workflow Progress</h3>
-              <div className="space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {steps.map((step, index) => {
                   const isCompleted = completedSteps.some(completed => completed.id === step.id);
                   const isCurrentlyProcessing = currentStepIndex === index;
